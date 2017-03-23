@@ -9,6 +9,73 @@ import re
 #working directory
 #/home/louic/Desktop/vaginal_samples/data_summer2016_vikash_data/vag_project/
 #load and split the nmr title data file
+
+def plot_spects(ppm,data,cx,cy):
+    countx = 0
+    county = 0
+    for i in data:
+        plt.plot(ppm+countx, i+county)
+        countx+=cx
+        county+=cy
+    plt.gca().invert_xaxis()
+    plt.show()
+    
+
+def scaletointegral(ydata):
+        integral = ydata.sum(1) / 100
+        newydata = np.transpose(ydata.T / integral)
+        return np.array(newydata)
+        
+def scalepqn(ydata):
+      # 1: scale to integral
+      newydata = scaletointegral(ydata)
+      # 2: reference spectrum is median of all samples
+      yref = np.median(ydata, 0)
+      # 3: quotient of test spectra with ref spectra
+      yquot = newydata / yref
+      # 4: median of those quotients
+      ymed = np.median(yquot, 0)
+      # 5: divide by this median
+      newydata = newydata / ymed
+      return np.array(newydata)
+      
+def do_pca(data):
+  pca = decomp.PCA(n_components  = 2)
+  pca.fit(data)
+  pca_score = pca.explained_variance_ratio_
+  V = pca.components_
+  X = pca.transform(data)
+  
+  return X, V, pca_score
+  
+def pcascores(data, explained_variance, group):
+  sns.set(font_scale = 1.5)
+  colors = sns.color_palette('dark')
+  ax = sns.lmplot('PC1', 'PC2', data = data, hue = group, fit_reg = False, palette =colors,
+	      scatter_kws ={"s":75, "alpha":0.4} )
+  d2 = data.groupby(group)
+  d2 = d2.mean()
+  ax.axes[0][0].scatter(x = 'PC1', y = 'PC2', data = d2, s =250, color = 'grey')
+  for i in d2.index:
+    ax.axes[0][0].annotate("%i"%i, xy = (d2.ix[i]['PC1'], d2.ix[i]['PC2']))
+  #for i, txt in enumerate(pcadat['names']):
+  # plt.annotate(i, (pcadat['PC1'].ix[i], pcadat['PC2'].ix[i] ))   
+  ax.set(title = "PCA Scores Plot",
+	xlabel = "PC1 (%.2f%% explained variance)" %(explained_variance[0]), 
+	ylabel = "PC2 (%.2f%% explained variance)" %(explained_variance[1])
+	)
+	
+	
+  plt.show()
+  
+def pca_scores_and_density(data, x ='PC1', y = 'PC2', hue = 'group'):
+  g = sns.PairGrid(data, vars = [x,y], hue = hue)
+  g = g.map_diag(sns.kdeplot)
+  g = g.map_offdiag(plt.scatter)
+  g = g.add_legend()
+  plt.show()  
+  
+  
 pat_metadata = []
 all_dat_dict = []
 
@@ -102,43 +169,7 @@ final_spreadsheet.to_csv('final_spreadsheet.csv')
 
 #now to remove data that isn't going to be used in the analysis due to errors in nmr runs
 
-def plot_spects(ppm,data,cx,cy):
-    countx = 0
-    county = 0
-    for i in data:
-        plt.plot(ppm+countx, i+county)
-        countx+=cx
-        county+=cy
-    plt.gca().invert_xaxis()
-    plt.show()
-    
 
-def scaletointegral(ydata):
-        integral = ydata.sum(1) / 100
-        newydata = np.transpose(ydata.T / integral)
-        return np.array(newydata)
-        
-def scalepqn(ydata):
-      # 1: scale to integral
-      newydata = scaletointegral(ydata)
-      # 2: reference spectrum is median of all samples
-      yref = np.median(ydata, 0)
-      # 3: quotient of test spectra with ref spectra
-      yquot = newydata / yref
-      # 4: median of those quotients
-      ymed = np.median(yquot, 0)
-      # 5: divide by this median
-      newydata = newydata / ymed
-      return np.array(newydata)
-      
-def do_pca(data):
-  pca = decomp.PCA(n_components  = 2)
-  pca.fit(data)
-  pca_score = pca.explained_variance_ratio_
-  V = pca.components_
-  X = pca.transform(data)
-  
-  return X, V, pca_score
   
 #do a PCA to identify outliers (bad phases, shim etc..)  
 
@@ -240,12 +271,7 @@ plt.show()
 
 pcadat = pd.concat([pcadat,metadata],axis = 1)
 pcadat = test.drop('index', axis =1)
-def pca_scores_and_density(data, x ='PC1', y = 'PC2', hue = 'group'):
-  g = sns.PairGrid(data, vars = [x,y], hue = hue)
-  g = g.map_diag(sns.kdeplot)
-  g = g.map_offdiag(plt.scatter)
-  g = g.add_legend()
-  plt.show()
+
 g = sns.PairGrid(pcadat, vars = ['PC1', 'PC2'], hue = 'clinical group')
 g = g.map_diag(sns.kdeplot)
 g = g.map_offdiag(plt.scatter)
@@ -257,25 +283,7 @@ g = g.map_offdiag(plt.scatter)
 g = g.add_legend()
 plt.show()
 
-def pcascores(data, explained_variance, group):
-  sns.set(font_scale = 1.5)
-  colors = sns.color_palette('dark')
-  ax = sns.lmplot('PC1', 'PC2', data = data, hue = group, fit_reg = False, palette =colors,
-	      scatter_kws ={"s":75, "alpha":0.4} )
-  d2 = data.groupby(group)
-  d2 = d2.mean()
-  ax.axes[0][0].scatter(x = 'PC1', y = 'PC2', data = d2, s =250, color = 'grey')
-  for i in d2.index:
-    ax.axes[0][0].annotate("%i"%i, xy = (d2.ix[i]['PC1'], d2.ix[i]['PC2']))
-  #for i, txt in enumerate(pcadat['names']):
-  # plt.annotate(i, (pcadat['PC1'].ix[i], pcadat['PC2'].ix[i] ))   
-  ax.set(title = "PCA Scores Plot",
-	xlabel = "PC1 (%.2f%% explained variance)" %(explained_variance[0]), 
-	ylabel = "PC2 (%.2f%% explained variance)" %(explained_variance[1])
-	)
-	
-	
-  plt.show()
+
 		      #remove outliers
 #outliers =pd.read_csv('outliers.csv', header = None)
 #outliers = np.array(outliers)
